@@ -1,0 +1,50 @@
+name: Dependabot auto-merge
+
+# Minor and patch updates are merged once CI passes. Major updates get a
+# needs-review label and stay open.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  ci:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    uses: ./.github/workflows/ci.yml
+
+  automerge:
+    needs: ci
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge minor and patch updates
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: |
+          gh pr merge --squash --delete-branch "$PR_URL"
+          # Merges made with GITHUB_TOKEN don't trigger `push` workflows,
+          # so publish the new image explicitly.
+          gh workflow run publish.yml --ref main
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Flag major updates for review
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh label create needs-review --color D93F0B --description "Major update, review before merging" 2>/dev/null || true
+          gh pr edit "$PR_URL" --add-label needs-review
+          gh pr comment "$PR_URL" --body "Major version update: check the release notes before merging."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
