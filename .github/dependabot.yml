@@ -1,13 +1,11 @@
 version: 2
 updates:
   # Runtime + build dependencies. @actual-app/api must track the Actual
-  # server version (bumped monthly in homelab-gitops), so check daily.
+  # server version, so check daily.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "daily"
-      time: "06:00"
-      timezone: "Europe/London"
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
