@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -23,3 +27,19 @@ jobs:
       - run: npm test
 
       - run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  image:
+    # Make sure the Dockerfile still builds (and runs as non-root) before merge.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t t2a:ci .
+      - name: Image runs as non-root
+        run: |
+          user=$(docker run --rm --entrypoint id t2a:ci -u)
+          echo "uid=$user"
+          test "$user" != "0"

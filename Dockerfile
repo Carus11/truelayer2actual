@@ -19,6 +19,11 @@ WORKDIR /app
 COPY package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+# Run as the unprivileged `node` user (uid 1000) from the base image. The data
+# directory holds bank tokens and a budget cache, so it is created here and
+# owned by that user; a fresh named volume inherits this ownership.
+RUN mkdir -p /app/data && chown node:node /app/data && chmod 700 /app/data
+USER node
 VOLUME ["/app/data"]
 EXPOSE 3000
 # Always-on: Express dashboard + sync scheduler in one process.
