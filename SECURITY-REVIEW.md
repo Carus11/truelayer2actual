@@ -5,21 +5,21 @@
 - **Scope:** `src/` (web server, OAuth flow, token storage, TrueLayer and Actual
   clients, notifications), `Dockerfile`, GitHub workflows, production
   dependencies.
-- **Verdict:** OK to deploy **behind an authenticating proxy** (Cloudflare
-  Access), on an internal network with Actual.
+- **Verdict:** OK to deploy **behind an authenticating reverse proxy**, on an
+  internal network with Actual.
 
 ## Findings
 
-| # | Severity | Finding | Status in this fork / deployment |
+| # | Severity | Finding | Recommendation / status |
 |---|----------|---------|----------------------------------|
-| 1 | High | The dashboard has **no authentication**. Anyone who reaches it can start bank connections, delete connections, change pairings, add budgets and trigger syncs. Upstream assumes a LAN or a proxy with its own auth. | Deployed only behind Cloudflare Access (household policy), no published ports. |
-| 2 | Medium | Bank OAuth tokens (`data/tokens.json`), config (`data/config.json`, may hold an Actual encryption password) and a full cached copy of the Actual budget (`data/actual-cache/`) are stored **unencrypted** at rest. Files are written atomically with mode `0600`. | Named volume on the Coolify host only; directory `0700`, owned by non-root user. |
+| 1 | High | The dashboard has **no authentication**. Anyone who reaches it can start bank connections, delete connections, change pairings, add budgets and trigger syncs. Upstream assumes a LAN or a proxy with its own auth. | Only expose the dashboard through an authenticating reverse proxy; don't publish the port. |
+| 2 | Medium | Bank OAuth tokens (`data/tokens.json`), config (`data/config.json`, may hold an Actual encryption password) and a full cached copy of the Actual budget (`data/actual-cache/`) are stored **unencrypted** at rest. Files are written atomically with mode `0600`. | Keep `data/` on a private volume. The fork's image creates it `0700`, owned by a non-root user. |
 | 3 | Medium | Container ran as **root** (no `USER`). | Fixed: runs as `node` (uid 1000); CI asserts non-root. |
-| 4 | Medium | Uses the Actual **server password**, which grants full API access to Actual. | Talks to Actual over the internal compose network; password stored as a Coolify secret, never in git. |
-| 5 | Medium | OAuth `state` is not bound to the browser session, so anyone with dashboard access could complete a flow and link *their* bank into the budget. | Mitigated by #1 (only the household can reach the dashboard). |
-| 6 | Low | Base image tag not digest-pinned; upstream publishes `:latest`. | Image pinned by digest in homelab-gitops; Dependabot bumps base image weekly; publish now waits for CI. |
-| 7 | Low | `/healthz` is unauthenticated and returns consent-expiry dates and Actual init error text. | Behind Access with the rest of the app. |
-| 8 | Info | Host allow-list accepts any IP literal or single-label host (by design for LAN use). | Irrelevant behind the proxy; `DASHBOARD_URL` set. |
+| 4 | Medium | Uses the Actual **server password**, which grants full API access to Actual. | Reach Actual over an internal network; supply the password as a runtime secret, never in source control. |
+| 5 | Medium | OAuth `state` is not bound to the browser session, so anyone with dashboard access could complete a flow and link *their* bank into the budget. | Mitigated by #1 (only trusted users can reach the dashboard). |
+| 6 | Low | Base image tag not digest-pinned; upstream publishes `:latest`. | Pin the published image by digest where you deploy it; Dependabot bumps the base image weekly; publish now waits for CI. |
+| 7 | Low | `/healthz` is unauthenticated and returns consent-expiry dates and Actual init error text. | Covered by #1. |
+| 8 | Info | Host allow-list accepts any IP literal or single-label host (by design for LAN use). | Irrelevant behind a proxy; set `DASHBOARD_URL`. |
 
 ## Positives
 

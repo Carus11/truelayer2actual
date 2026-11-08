@@ -2,8 +2,6 @@ name: Create and publish a Docker image
 
 # Publishes ghcr.io/<owner>/truelayer2actual on every push to main, but only
 # after the CI workflow (tests, build, audit, non-root image check) passes.
-# Deployments pin the image by digest (homelab-gitops), and Dependabot there
-# proposes the new digest whenever `main` moves.
 on:
   push:
     branches: ['main']
